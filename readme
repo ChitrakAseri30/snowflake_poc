@@ -1,0 +1,707 @@
+# 🛡️ AtlasCare — Agentic AI for Customer Contact
+
+**Project AtlasCare** is a production-grade, LangGraph-based agentic AI system built for Acme Retail Co. It autonomously handles Tier-1 customer support interactions via a modern React chat UI, backed by a FastAPI server. The system supports SSO login via Auth0, dual personas (User & Admin), a live operational metrics dashboard, and a full observability/audit trail on every interaction.
+
+Technology Stack
+<br>
+
+## 📋 Table of Contents
+
+1. [Project Overview](#1-project-overview)
+2. [Technology Stack](#2-technology-stack)
+3. [Directory Structure — Explained File by File](#4-directory-structure--explained-file-by-file)
+4. [Environment Setup — `.env` Configuration](#5-environment-setup--env-configuration)
+5. [Data Setup — Populating JSON Files](#6-data-setup--populating-json-files)
+6. [Installation & Running the Application](#7-installation--running-the-application)
+7. [Authentication & User Personas](#8-authentication--user-personas)
+8. [Dummy Credentials for Testing](#9-dummy-credentials-for-testing)
+9. [API Reference](#10-api-reference)
+10. [Sample Questions to Ask the Agent](#11-sample-questions-to-ask-the-agent)
+11. [The Three Mandatory Test Journeys](#12-the-three-mandatory-test-journeys)
+12. [Known Limitations](#13-known-limitations)
+
+
+<br>
+
+## 1. Project Overview
+
+Acme Retail receives ~18,000 customer interactions per day. AtlasCare is an autonomous AI agent that resolves Tier-1 queries without human intervention — tracking orders, cancelling items, processing refunds, updating addresses, and enforcing business rules (e.g., auto-refund cap of ₹25,000).
+
+Refer to [`Architecture.md`](Architecture.md) for the complete Architecture documentation.
+ 
+ 
+
+### Core Capabilities
+
+| Capability | Description |
+|---|---|
+| **Order Tracking** | Fetches real-time order status and tracking details from OMS |
+| **Partial Cancellation & Refund** | Cancels individual line items and initiates refunds within policy limits |
+| **Address Update** | Updates shipping address on active orders or profile address in CRM |
+| **Escalation with Audit Trail** | Detects refunds above ₹25,000 threshold, creates a CRM case, and holds without touching the Payments tool |
+| **Policy Q&A** | Answers questions about return windows, refund SLAs, and platform rules from the Knowledge Base |
+| **SSO Login** | Secure Auth0-based login; user identity is verified on every API call |
+| **Admin Dashboard** | Real-time operational KPIs, token usage trends, query intent distribution, and escalation queue management |
+
+<br>
+
+## 2. Technology Stack
+
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| **Frontend** | React 23.11 + Vite | Chat UI, Metrics Dashboard |
+| **Auth** | Auth0 (SPA + API) | SSO login, JWT issuance |
+| **HTTP Client** | Axios | Frontend → Backend API calls |
+| **Charts** | Recharts | Token trends, intent pie chart |
+| **Backend** | FastAPI + Uvicorn | REST API server |
+| **Agent Framework** | LangGraph | Stateful ReAct agent graph |
+| **LLM** | Groq (llama-3.3-70b-versatile) | Reasoning and tool invocation |
+| **LLM Client** | LangChain-Groq | LangChain wrapper for Groq |
+| **Database** | SQLite | Persistent order, customer, case, and metrics state |
+| **JWT Validation** | python-jose | Auth0 RS256 token verification |
+| **Logging** | Python logging (RotatingFileHandler) | Structured application logs |
+
+
+<br>
+
+## 3. Directory Structure — Explained File by File
+```
+chitrak_aseri_46561/
+│
+├── frontend/                           # React frontend (Vite)
+│   ├── index.html                      # HTML shell
+│   ├── package.json                    # npm dependencies and scripts
+│   ├── eslint.config.js                # ESLint configuration
+│   └── src/
+│       ├── main.jsx                 # Entry point; Auth0Provider
+│       ├── App.jsx                  # Root, routing, persona logic
+│       ├── App.css                  # Global styles, and layout
+│       ├── index.css                # CSS resets and base styles
+│       │
+│       ├── api/
+│       │   └── index.js             # Axios, interceptors, API calls
+│       │
+│       ├── assets/
+│       │   ├── logo.png             # Acme logo 
+│       │   ├── logoBG.png           # Logo for header bar
+│       │   ├── hero.png             # Hero image asset
+│       │   └── react.svg            # Default Vite asset
+│       │
+│       ├── components/
+│       │   ├── ChatPanel.jsx        # Chat interface with message bubbles, quick-test buttons
+│       │   ├── MetricsDash.jsx      # Admin metrics dashboard (KPIs, charts, escalation queue)
+│       │   ├── MetricsDash.css      # Dashboard-specific styles
+│       │   ├── TokenChart.jsx       # Recharts BarChart: hourly token usage
+│       │   ├── CategoryPieChart.jsx # Recharts PieChart: query intent distribution
+│       │   ├── EscalationList.jsx   # Escalation list sub-component
+│       │   └── TraceViewer.jsx      # Renders trace_id, latency, tool calls per message
+│       │
+│       ├── hooks/
+│       │   └── useMetrics.js        # Custom hook: polls 3 metrics APIs every 10s
+│       │
+│       └── pages/
+│           └── Dashboard.jsx        # Alternative dashboard page (legacy/unused in main flow)
+│
+├── src/                             # Backend source code
+│   ├── agent/                       # LangGraph agent logic
+│   │   ├── Graph.py                 # Agent graph definition & execution
+│   │   ├── Tools.py                 # All 5 LangChain tools
+│   │   ├── Tracer.py                # Telemetry/audit trail per request
+│   │   └── __init__.py
+│   │
+│   ├── api/                         # FastAPI route handlers
+│   │   ├── Router.py                # /query and /health endpoints
+│   │   ├── Metrics.py               # Dashboard metrics endpoints
+│   │   ├── Middleware.py            # Auth0 JWT validation middleware
+│   │   └── Model.py                 # Pydantic request/response models
+│   │
+│   ├── database/                    # Data layer
+│   │   ├── acme_retail.db           # SQLite database (auto-created)
+│   │   ├── orders.json              # Seed data: OMS orders
+│   │   ├── crm_cases.json           # Seed data: CRM customer profiles
+│   │   ├── kb_articles.json         # Seed data: Knowledge Base articles
+│   │   ├── payment_config.json      # Payment gateway rules & refund limits
+│   │   └── SetupDB.py               # SQLite schema creation script
+│   │
+│   └── utils/                       # Shared utilities
+│       ├── Constants.py             # LLM config, DB paths, SSO constants
+│       └── LoggerSetup.py           # Logging configuration (console + file)
+│       
+│
+├── traces/traces.json               # JSON file for trace files
+├── .env                             # Environment variables (GEMINI_API_KEY, SSO config)
+├── architecture.md                  # Architecture design, planning, and tool-call strategy
+├── main.py                          # Application entry point
+├── README.md                        # Main project documentation and setup instructions
+├── requirements.txt                 # All Python dependencies (pinned versions)
+├── testing.docx                     # Test plan summary and scope document
+└── kpi.docx                         # KPI framework document (business, quality, safety metrics)
+```
+
+### Key File Descriptions
+
+#### `main.py` — Application Entry Point
+The single command to run the entire stack. On startup it:
+1. Spawns the React Vite dev server as a background daemon thread (calls `npm run dev` inside `./frontend`)
+2. Waits 2 seconds for Vite to initialize, then opens `http://localhost:5173` in the browser
+3. Starts the FastAPI backend on `http://127.0.0.1:8000` on the main thread
+4. Registers a global exception handler so any unhandled errors return clean JSON instead of raw stack traces
+
+#### `src/agent/Graph.py` — The LangGraph Agent
+Defines the two-node ReAct loop:
+- **Reasoner Node**: Invokes the Groq LLM with the full conversation history + system prompt. Decides whether to respond directly or call a tool.
+- **ToolNode**: LangGraph's built-in parallel executor — runs all tool calls the LLM requested simultaneously.
+- **MemorySaver**: Persists conversation state by `thread_id` (= `session_id`), enabling multi-turn memory within a session.
+- **`run_agent()`**: The async entry point called by the Router. After the graph completes, it extracts escalation status, token usage, journey classification, and populates the tracer and SQLite performance_logs table.
+
+#### `src/agent/Tools.py` — The 5 Agent Tools
+All tools use `RunnableConfig` to securely access `user_email` injected by the Router — no email is ever passed directly by the user.
+
+| Tool | What it Does |
+|---|---|
+| `get_order_details` | Fetches order(s) for the authenticated user. Merges SQLite (mutated state) with JSON (seed state); SQLite always wins. Pass `order_id=""` to get all orders. |
+| `get_customer_profile` | Returns the user's CRM profile: name, tier, phone, addresses, preferred refund method. Checks SQLite first, falls back to JSON. |
+| `cancel_and_refund_item` | Cancels a specific line item. Checks for duplicate escalation cases. Enforces the ₹25,000 refund cap — creates a CRM case if exceeded, otherwise mutates the order in SQLite. |
+| `update_information` | Updates `phone`, `profile_address`, or `shipping_address`. For shipping address updates, validates the order is still in `placed`/`processing` status. |
+| `get_company_policies` | Returns the full KB articles and payment configuration as JSON for the LLM to reason over. |
+
+#### 1) `src/agent/Tracer.py` — Audit Trail
+Creates a `Tracer` object per request that records every tool call: name, inputs, output, success/failure flag, and timestamp. The full trace is returned in the API response and visible in the chat UI as metadata (latency, tool count, trace ID).
+
+#### 2) `src/api/Router.py` — Query & Health Endpoints
+- Enforces a **rate limit of 10 requests per minute per session** (sliding window, stored in memory)
+- Wraps `run_agent()` in a **15-second timeout** using `asyncio.wait_for`
+- Extracts `user_email` from the verified JWT and passes it to the agent via `config`
+- Tracks in-memory metrics: total requests, total latency, latency samples (for p95/p99), escalations, journey distribution
+
+#### 3) `src/api/Metrics.py` — Dashboard Endpoints
+Four endpoints protected by JWT:
+- `GET /metrics/summary` — open vs. resolved case counts
+- `GET /escalations/list` — all open cases for the Human Specialist Queue
+- `PATCH /escalations/{id}/resolve` — marks a case as resolved
+- `GET /metrics/business-kpis` — deflection rate, API cost estimate, hourly token trend, intent distribution
+
+#### 4) `src/api/Middleware.py` — Auth0 JWT Verification
+- Fetches Auth0's JWKS (JSON Web Key Set) with a **1-hour cache** to avoid hitting Auth0 on every request
+- Matches the token's `kid` to the appropriate RSA public key
+- Validates algorithm (RS256), audience, and issuer
+- Raises clean HTTP 401 responses for expired, invalid, or missing tokens
+
+#### 5) `src/utils/Constants.py` — Configuration Hub
+Central file for all constants: LLM model name, temperature, system prompt, database paths, Auth0 domain/audience, and JWKS cache TTL. Change configuration here, not scattered across the codebase.
+
+
+#### 6) `src/database/SetupDB.py` — Database Initialization Engine
+This script is responsible for bootstrapping the local SQLite database (`acme_retail.db`) that serves as the mock enterprise data layer for AtlasCare. 
+
+When executed, it performs a complete teardown and rebuild of the schema to ensure a clean state for testing:
+1. **Schema Teardown:** Drops all existing tables safely (`DROP TABLE IF EXISTS`), respecting foreign key constraints by removing child tables first.
+2. **Table Creation:** Generates 4 primary tables to store state and telemetry:
+   - `customers`: Stores user profiles, contact information, and refund preferences (CRM Mock).
+   - `orders`: Acts as the primary Source of Truth for order statuses, tracking numbers, and line items (OMS Mock).
+   - `cases`: Records human-in-the-loop escalations triggered by the LangGraph engine (e.g., refunds exceeding ₹25,000).
+   - `performance_logs`: A high-frequency telemetry table that logs session token usage, escalation flags, and interaction journeys for the Metrics Dashboard.
+
+**Usage:**
+```bash
+python src/database/SetupDB.py
+```
+
+<br>
+
+## 4. Environment Setup — `.env` Configuration
+
+Create a `.env` file in the **project root** (same directory as `main.py`):
+
+```env
+# ====================================================
+#  AtlasCare — Environment Variables
+# ====================================================
+
+GROQ_API_KEY = 'gsk_your_groq_api_key_here'
+```
+
+
+#### Where Environment Variables Are Used
+
+| Variable | Used In | Purpose |
+|---|---|---|
+| `GROQ_API_KEY` | `src/agent/Graph.py` via `langchain_groq.ChatGroq` | Authenticates requests to the Groq LLM API |
+
+The `.env` file is loaded via `python-dotenv`'s `load_dotenv()` call at the top of `Graph.py`. LangChain automatically reads `GROQ_API_KEY` from the environment when initializing `ChatGroq`.
+
+<br>
+
+## 5. Data Setup — Populating JSON Files
+
+The agent's tools load data from four JSON files in `src/database/`. These act as the **seed / source-of-truth** for the mock enterprise systems. The SQLite database stores mutations (cancellations, address updates) on top of this seed data.
+
+> **Critical**: If you are adding your own data, make sure to add the data first and only then run the server to test it out.
+
+### 6.1 `orders.json` — OMS (Order Management System)
+
+**Location**: `src/database/orders.json`
+
+**Schema**:
+```json
+{
+  "orders": [
+    {
+      "order_id": "ORD-XXXXX",       // Unique order ID (string, e.g., "ORD-50001")
+      "customer_id": "CUST-XXX",     // Must match a customer_id in crm_cases.json
+      "status": "placed",            // "placed" | "processing" | "shipped" | "delivered" | "cancelled"
+      "created_at": "2026-05-27T10:00:00Z",  // ISO 8601 datetime
+      "estimated_delivery": "2026-06-05",     // YYYY-MM-DD
+      "tracking_number": null,               // null if not shipped yet
+      "shipping_address": {
+        "line1": "12 MG Road",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "pincode": "560034"
+      },
+      "items": [
+        {
+          "line_id": 1,                      // Integer, starts at 1, unique per order
+          "product_id": "PROD-PHONE-APPLE",
+          "name": "iPhone 16",
+          "quantity": 1,
+          "unit_price": 70000.00,            // In INR (₹)
+          "status": "active"                 // "active" | "cancelled"
+        }
+      ],
+      "total_amount": 70000.00,
+      "payment_method": "HDFC_CREDIT"       // Must match a value in payment_config.json
+    }
+  ]
+}
+```
+
+**Adding a new order**: Copy an existing order block, change the `order_id` and `customer_id`, and ensure all `line_id` values within `items` are unique integers starting from 1.
+
+**To trigger J3 Escalation**: Ensure an item's `unit_price × quantity > 25000`. Example: a laptop at ₹42,000.
+
+**To test J1 Tracking**: Any order with a non-null `tracking_number` will show tracking info. If no Order number is mentioned, then the last record based upon "created_at" date will be returned.
+
+### 6.2 `crm_cases.json` — CRM (Customer Records)
+
+**Location**: `src/database/crm_cases.json`
+
+**Schema**:
+```json
+{
+  "customers": [
+    {
+      "customer_id": "CUST-001",
+      "name": "Chitrak Aseri",
+      "email": "chitrak.aseri@acme.com",    // Must match the Auth0 account email EXACTLY
+      "phone": "+91-9876543210",
+      "tier": "platinum",                   // "platinum" | "gold" | "standard"
+      "order_ids": ["ORD-50001", "ORD-50002"],
+      "preferred_refund_method": "HDFC_CREDIT",
+      "addresses": [
+        {
+          "label": "home",                  // Unique label per customer
+          "line1": "12 MG Road",
+          "city": "Bengaluru",
+          "state": "Karnataka",
+          "pincode": "560034"
+        }
+      ]
+    }
+  ],
+  "cases": []                               // Leave empty; agent populates this at runtime via SQLite
+}
+```
+
+> **Critical**: The `email` field in `crm_cases.json` must exactly match the email address used to log in via Auth0. This is how the agent maps your identity to your orders.
+
+**Adding a new user**: Add a new entry to the `customers` array with a unique `customer_id` and the email they use to log in.
+
+### 6.3 `kb_articles.json` — Knowledge Base
+
+**Location**: `src/database/kb_articles.json`
+
+**Schema**:
+```json
+{
+  "articles": [
+    {
+      "article_id": "KB-001",
+      "title": "Refund Policy and Threshold Rules",
+      "tags": ["refund", "threshold", "payments"],
+      "content": "Full policy text here...",
+      "last_updated": "2025-04-01",
+      "applies_to": ["electronics", "apparel", "home_goods"]
+    }
+  ]
+}
+```
+
+Add articles here for any new policies. The `get_company_policies` tool returns the entire KB to the LLM, so keep articles focused and factual.
+
+### 6.4 `payment_config.json` — Payment Gateway Rules
+
+**Location**: `src/database/payment_config.json`
+
+```json
+{
+  "auto_refund_limit_inr": 25000,           // The hard cap for automated refunds
+  "supported_methods": ["HDFC_CREDIT", "ICICI_DEBIT", "SBI_NETBANKING", "UPI", "original"],
+  "refund_sla_days": 5,
+  "behaviour": {
+    "failure_rate": 0.03,
+    "failure_code": "504",
+    "failure_message": "PAYMENT_GATEWAY_TIMEOUT"
+  }
+}
+```
+
+Change `auto_refund_limit_inr` to adjust the escalation threshold.
+
+<br>
+
+## 6. Installation & Running the Application
+
+### Prerequisites
+
+| Requirement | Version | Notes |
+|---|---|---|
+| Python | 3.10, 3.11, or 3.12 | Python 3.11 recommended (matches .pyc files in repo) |
+| Node.js | 18+ | Required to run the Vite frontend |
+| npm | 9+ | Comes with Node.js |
+| Git | Any | To clone the repo |
+
+### Step 1 — Clone / Extract the Project
+
+```bash
+# If you have the zip:
+unzip chitrak_aseri_46561.zip
+cd chitrak_aseri_46561
+```
+
+### Step 2 — Create and Configure the `.env` File
+
+> **Critical**: The `.env` filed already exists and Users just need to replace the Placeholder value with their actual GROQ API Keys.
+
+### Step 3 — Install Python Dependencies
+
+This installs all pinned Python packages including: `fastapi`, `uvicorn`, `langchain-groq`, `langgraph`, `langgraph-checkpoint`, `python-dotenv`, `python-jose`, `httpx`, and more.
+
+**Tip for virtual environments** (recommended):
+> ```bash
+> python -m venv venv
+> source venv/bin/activate        # macOS/Linux
+> venv\Scripts\activate           # Windows
+> pip install -r requirements.txt
+> ```
+
+### Step 4 — Install Frontend Dependencies
+
+```bash
+# Navigate into the frontend directory
+cd frontend
+npm install
+cd ..        # Return to project root
+```
+
+This installs React, Auth0, Axios, Recharts, Vite, and all other frontend packages into `frontend/node_modules/`.
+
+### Step 5 — Run the Application
+
+```bash
+# From the project root directory
+python main.py
+```
+
+This single command:
+1. Starts the FastAPI backend server on `http://127.0.0.1:8000`
+2. Starts the Vite frontend dev server on `http://localhost:5173`
+3. Automatically opens `http://localhost:5173` in your browser after 2 seconds
+
+**Expected console output:**
+```
+[INFO] 🚀 Booting up the AtlasCare React Frontend...
+[INFO] ⚡ Starting the FastAPI Backend Server on port 8080...
+[INFO] 🌐 Opening AtlasCare in your default web browser...
+INFO:     Started server process [XXXXX]
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+```
+
+<br>
+
+### Running Frontend and Backend Separately (Alternative)
+
+If `python main.py` doesn't auto-open the browser or you want separate terminals:
+
+**Terminal 1 — Backend:**
+```bash
+uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+**Terminal 2 — Frontend:**
+```bash
+cd frontend
+npm run dev
+```
+
+Then open `http://localhost:5173` manually.
+
+<br>
+
+## 7. Authentication & User Personas
+
+AtlasCare uses **Auth0** as the SSO provider. Two persona types are supported:
+
+### User Persona (Default)
+- Sees only the **Chat** interface
+- Can track orders, cancel items, request refunds, update information
+- Cannot access the Metrics Dashboard
+- All data access is scoped to their own account (email → customer_id mapping enforced in every tool)
+
+### Admin Persona
+- Sees both **Chat** and **Metrics** tabs in the navigation bar
+- Can view the Operational Dashboard: KPI cards, token usage trends, intent distribution, and the Human Specialist Queue
+- Can click **"Mark as Done"** to resolve escalation cases
+- Admin detection: the app checks for `https://atlascare.com/roles` = `["admin"]` in the JWT claims.
+
+
+
+
+
+<br>
+
+## 8. Dummy Credentials for Testing
+
+The following test accounts are pre-configured in the SSO setup and as well as the `crm_cases.json`. To log in, simply enter the email address and password in the SSO Login page. 
+
+### User Account (Standard Customer)
+
+| Field | Value |
+|---|---|
+| **Email** | `chitrak.aseri@acme.com` |
+| **Password** | chitrak@123 |
+| **Customer ID** | `CUST-001` |
+| **Tier** | Platinum |
+| **Orders** | `ORD-50001` (iPhone 16 + USB-C Cable`ORD-50002` (Sony WH-1000XM5) |
+| **Persona** | Regular User (Chat only) |
+
+<br>
+
+| Field | Value |
+|---|---|
+| **Email** | `mehul.gupta@acme.com` |
+| **Password** | mehul@123 |
+| **Customer ID** | `CUST-002` |
+| **Tier** | Standard |
+| **Orders** | `ORD-60000` (Mechanical Keyboard) |
+| **Persona** | Regular User (Chat only) |
+
+### Admin Account
+
+| Field | Value |
+|---|---|
+| **Email** | `admin@acmeretail.com` |
+| **Password** | admin@123 |
+| **Customer ID** | N/A (admin may not have orders) |
+| **Persona** | Admin (Chat + Metrics Dashboard) |
+
+### Other Customer (No data Configured)
+
+These credentials can be used to access the application; however, the database does not currently contain any data for the chatbot to generate responses. To enable meaningful chatbot interactions, data must be added manually to the `crm_cases.json` and `orders.json` files.
+
+| Field | Value |
+|---|---|
+| **Email** | `nipun.tank@acme.com` |
+| **Password** | nipun@123 |
+| **Persona** | Regular User |
+
+
+| Field | Value |
+|---|---|
+| **Email** | `keshav.vijay@acme.com` |
+| **Password** | keshav@123 |
+| **Persona** | Regular User |
+
+| Field | Value |
+|---|---|
+| **Email** | `dipen.khan@acme.com` |
+| **Password** | dipen@123 |
+| **Persona** | Regular User |
+
+<br>
+
+> **Security Note**: Logging in as `chitrak.aseri@acme.com` and asking "show me order ORD-60000" will return an error — the tool enforces ownership via the email → customer_id mapping. This cross-customer isolation is by design.
+
+### Extracting Token to test Backend APIs
+
+Step 1: Run the main.py file, once the Landing page opens, click on SSO Login
+
+Step 2: Login with your desired credentials mentioned in the above section.
+
+Step 3: Open the Inspect Menu. Click on Application Tab. 
+
+![image](src/utils/images/a.png)
+
+Step 4: Click on Local Storage and Copy the JWT token.
+
+![image](src/utils/images/b.png)
+
+Step 5: Paste the JWT token in the FastAPI Swagger.
+
+![image](src/utils/images/c.png)
+
+Step 6: Click on Authorize and now you will be able to test the Backend APIs.
+
+<br>
+
+## 9. API Reference
+
+### POST `/query`
+Main agent endpoint. Requires `Authorization: Bearer <token>` header.
+
+**Request:**
+
+![Query Request](src/utils/images/request.png)
+
+**Response (HTTP 200):**
+
+![Query Response](src/utils/images/response.png)
+
+### GET `/health`
+Simple health check. No auth required.
+
+![Health Endpoint](src/utils/images/health.png)
+
+
+<br>
+
+## 10. Sample Questions to Ask the Agent
+
+### 🔍 Order Tracking
+```
+- Where is my order?
+-What's the status of my orders?
+- Show me all my orders.
+- Track order ORD-50001.
+- When will my order be delivered?
+- What is the tracking number for my order?
+```
+
+### ❌ Order Cancellation & Refunds
+```
+- Cancel item 1 from my order ORD-50001.
+- I want to cancel the USB-C cable from my order.
+- Cancel item 2 from ORD-50001 and refund it to my HDFC card.
+- I want to return the Sony headphones I ordered.
+- Can I cancel my iPhone order?
+```
+
+### 💳 Escalation Scenarios (Above ₹25,000 Threshold)
+```
+- I want a full refund of ₹42,000 for order ORD-50001. The laptop arrived damaged.
+- Refund ₹70,000 for my iPhone — it was broken when I received it.
+- I need to return this laptop, it costs ₹60,000.
+```
+*(These will NOT trigger a payment — they create a CRM case and hold for human review)*
+
+### 📦 Address Updates
+```
+- Change the shipping address for my order to 5 Brigade Road, Bengaluru, 560001.
+- Update my phone number to +91-9999999999.
+- Change my home address to Flat 12, Koramangala, Bengaluru 560034.
+- Ship order ORD-50001 to my office at 45 Whitefield, Bengaluru, 560066.
+```
+
+### 📋 Policy Questions
+```
+- What is your return policy?
+- How long do I have to return an item?
+- What is the refund limit?
+- How long does a refund take?
+- What happens if my refund exceeds ₹25,000?
+- What is your escalation SLA?
+- Can I partially cancel an order?
+```
+
+### 🧩 Compound / Multi-Step Requests
+```
+- Cancel item 2 from my order, refund it to my HDFC card, and ship the rest to my office address.
+- I want to cancel the USB cable from ORD-50001, get a refund, and update my phone number.
+- Change the address on my latest order and tell me when it will arrive.
+```
+
+### 👤 Profile & Account Questions
+```
+- What is my customer tier?
+- What addresses do I have on file?
+- What is my preferred refund method?
+- Show me my profile information.
+```
+
+<br>
+
+## 11. The Three Mandatory Test Journeys
+
+### J1 — Simple Order Tracking
+
+
+```
+Where is my order?
+```
+
+**Expected behavior**:
+- Agent calls `get_order_details` exactly once
+- Returns order status, estimated delivery, and tracking number (if available)
+- Response in under 3 seconds
+- No escalation; no hallucinated data
+
+---
+
+### J2 — Multi-Step Compound Request
+
+
+```
+Cancel item 2 from my order, refund to HDFC card, reship rest to my office address
+```
+
+**Expected behavior**:
+1. Agent calls `get_order_details` to look up the order and identify `line_id=2`
+2. Agent calls `cancel_and_refund_item(order_id, line_id=2)` — cancels item, initiates refund (if ≤₹25,000)
+3. Agent calls `update_information(update_target="shipping_address", ...)` to update remaining items' address
+4. All three tool outcomes recorded in the trace
+5. Agent confirms each step accurately in the response
+
+---
+
+### J3 — Escalation with Audit Trail
+
+
+```
+I want a full refund of Rs.42000 for my order. Laptop arrived damaged.
+```
+
+**Expected behavior**:
+- Agent calls `cancel_and_refund_item` for the relevant item
+- Tool detects `refund_amount (42000) > AUTO_REFUND_LIMIT (25000)`
+- Tool does **NOT** call any payment processing logic
+- Tool creates a CRM case: `CASE-<timestamp>` in the `cases` SQLite table
+- Agent returns a polite holding message: *"Your request has been escalated to our specialist team..."*
+- Case appears immediately in the Admin Dashboard → Human Specialist Queue
+- `is_escalated: true` in the trace
+
+<br>
+
+## 12. Known Limitations
+
+| Limitation | Detail |
+|---|---|
+| **In-memory session storage** | LangGraph `MemorySaver` stores conversation history in RAM. Restarting the server clears all session histories. Use `langgraph-checkpoint-sqlite` for persistence across restarts. |
+| **No production payment integration** | The Payments Gateway is simulated. `cancel_and_refund_item` mutates the SQLite DB and logs the refund intent but does not call a real payment API. |
+| **Rate limiting is in-memory** | The rate limiter in `Router.py` uses a Python dict. In a multi-worker deployment this would not be shared. Replace with Redis-based rate limiting for production. |
+| **Auth0 free tier** | The Auth0 tenant used (`acme-atlascare.us.auth0.com`) is a development tenant. For production, configure a dedicated tenant with proper RBAC rules. |
+| **Single-database instance** | SQLite is not suitable for high-concurrency production workloads. Replace with PostgreSQL or another managed database. |
+| **CORS wildcard** | `allow_origins=['*']` in `main.py` is permissive for development. In production, restrict to the specific frontend domain. |
+| **Token latency** | Groq's free tier has rate limits. Under high load, the 15-second timeout may be hit. Monitor `latency_ms` in traces. |
+| **No streaming responses** | The agent returns a complete response after the full graph execution. Streaming would improve perceived latency for long responses. |
+| **Frontend not production-built** | The frontend runs as a Vite dev server. For production, run `npm run build` and serve the static files from FastAPI or a CDN. |

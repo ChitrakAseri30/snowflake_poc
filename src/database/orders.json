@@ -1,0 +1,90 @@
+{
+  "orders": [
+    {
+      "order_id": "ORD-50001",
+      "customer_id": "CUST-001",
+      "status": "placed",
+      "created_at": "2026-05-27T10:00:00Z",
+      "estimated_delivery": "2026-06-05",
+      "tracking_number": null,
+      "shipping_address": {
+        "line1": "12 MG Road",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "pincode": "560034"
+      },
+      "items": [
+        {
+          "line_id": 1,
+          "product_id": "PROD-PHONE-APPLE",
+          "name": "iphone 16",
+          "quantity": 1,
+          "unit_price": 70000.00,
+          "status": "active"
+        },
+        {
+          "line_id": 2,
+          "product_id": "PROD-CABLE-05",
+          "name": "USB-C Charging Cable",
+          "quantity": 1,
+          "unit_price": 500.00,
+          "status": "active"
+        }
+      ],
+      "total_amount": 70500.00,
+      "payment_method": "HDFC_CREDIT"
+    },
+    {
+      "order_id": "ORD-50002",
+      "customer_id": "CUST-001",
+      "status": "placed",
+      "created_at": "2026-05-10T10:00:00Z",
+      "estimated_delivery": "2026-05-12",
+      "tracking_number": "TRACK-DELIVERED-123",
+      "shipping_address": {
+        "line1": "12 MG Road",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "pincode": "560034"
+      },
+      "items": [
+        {
+          "line_id": 1,
+          "product_id": "PROD-HEADPHONES-01",
+          "name": "Sony WH-1000XM5",
+          "quantity": 1,
+          "unit_price": 18000.00,
+          "status": "active"
+        }
+      ],
+      "total_amount": 18000.00,
+      "payment_method": "HDFC_CREDIT"
+    },
+    {
+      "order_id": "ORD-60000",
+      "customer_id": "CUST-002",
+      "status": "shipped",
+      "created_at": "2026-05-20T10:00:00Z",
+      "estimated_delivery": "2026-05-30",
+      "tracking_number": "TRACK-HACKER-404",
+      "shipping_address": {
+        "line1": "Secret Base",
+        "city": "Unknown",
+        "state": "Unknown",
+        "pincode": "000000"
+      },
+      "items": [
+        {
+          "line_id": 1,
+          "product_id": "PROD-KEYBOARD-01",
+          "name": "Mechanical Keyboard",
+          "quantity": 1,
+          "unit_price": 60000.00,
+          "status": "active"
+        }
+      ],
+      "total_amount": 60000.00,
+      "payment_method": "UPI"
+    }
+  ]
+}

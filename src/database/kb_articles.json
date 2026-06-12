@@ -1,0 +1,36 @@
+{
+  "articles": [
+    {
+      "article_id": "KB-001",
+      "title": "Refund Policy and Threshold Rules",
+      "tags": ["refund", "threshold", "payments", "escalation", "return"],
+      "content": "Acme Retail processes refunds automatically for amounts up to Rs.25,000 via the Payments Gateway. Refund requests exceeding Rs.25,000 must be escalated to a human specialist via the CRM. The specialist team has a 24-hour response SLA. Damaged or defective items are eligible for a full refund regardless of value, subject to specialist approval for amounts above the threshold.",
+      "last_updated": "2025-04-01",
+      "applies_to": ["electronics", "apparel", "home_goods"]
+    },
+    {
+      "article_id": "KB-002",
+      "title": "Return Window Policy",
+      "tags": ["return", "window", "days", "time", "policy"],
+      "content": "Customers must raise return or refund requests within 30 days of the delivery date. Requests raised after 30 days will be automatically rejected by the system unless extended warranty applies.",
+      "last_updated": "2025-04-01",
+      "applies_to": ["electronics", "apparel", "home_goods"]
+    },
+    {
+      "article_id": "KB-003",
+      "title": "Escalation SLA and Support",
+      "tags": ["escalation", "sla", "support", "time", "agent"],
+      "content": "All cases escalated to the human specialist team have a strict 24-hour Service Level Agreement (SLA) for the first response. Resolutions are typically completed within 3 to 5 business days.",
+      "last_updated": "2025-04-01",
+      "applies_to": ["electronics", "apparel", "home_goods"]
+    },
+    {
+      "article_id": "KB-004",
+      "title": "Partial Cancellation and Reshipping",
+      "tags": ["partial", "cancellation", "reshipping", "items", "modify"],
+      "content": "Customers can cancel individual items (partial cancellation) within an order prior to delivery. If an item is cancelled, the refund is processed only for that specific item. Reshipping of individual cancelled items is not currently supported; the customer must place a brand new order.",
+      "last_updated": "2025-04-01",
+      "applies_to": ["electronics", "apparel", "home_goods"]
+    }
+  ]
+}

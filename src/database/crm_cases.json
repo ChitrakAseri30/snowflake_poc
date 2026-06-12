@@ -1,0 +1,33 @@
+{
+  "customers": [
+    {
+      "customer_id": "CUST-001",
+      "name": "Chitrak Aseri",
+      "email": "chitrak.aseri@acme.com",
+      "phone": "+91-9876543210",
+      "tier": "platinum",
+      "order_ids": ["ORD-50001", "ORD-50002"],
+      "preferred_refund_method": "HDFC_CREDIT",
+      "addresses": [
+        {
+          "label": "home",
+          "line1": "12 MG Road",
+          "city": "Bengaluru",
+          "state": "Karnataka",
+          "pincode": "560034"
+        }
+      ]
+    },
+    {
+      "customer_id": "CUST-002",
+      "name": "Mehul Gupta",
+      "email": "mehul.gupta@acme.com",
+      "phone": "+91-7129387451",
+      "tier": "standard",
+      "order_ids": ["ORD-60000"],
+      "preferred_refund_method": "UPI",
+      "addresses": []
+    }
+  ],
+  "cases": []
+}
